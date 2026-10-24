@@ -1,6 +1,6 @@
 """
-dataset.py - data loading, leakage-free splitting and augmentation for HipMRI.
-
+dataset.py - data loading, splitting and augmentation for HipMRI.
+    * the study has 38 patients but 211 volumes
     * The 3D model and the 2D baseline are built from the SAME downsampled
       volumes and the SAME split, so they are compared on identical data.
 """
@@ -17,32 +17,33 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-#  dataset constants
+# dataset constants
 DATA_ROOT = "/home/groups/comp3710/HipMRI_Study_open"
 IMAGE_DIR = "semantic_MRs"
 LABEL_DIR = "semantic_labels_only"
-PATIENT_REGEX = r"^(B\d+)_Week" 
-NUM_CLASSES = 6                 
+PATIENT_REGEX = r"^([A-Z]\d+)_Week" 
+NUM_CLASSES = 6                 # background, body, bone, bladder, rectum, prostate
 BACKGROUND_LABEL = 0
 BLADDER_LABEL = 3
 RECTUM_LABEL = 4
 PROSTATE_LABEL = 5
 TARGET_SHAPE = (128, 128, 64)   # downsampled 
+LEFT_RIGHT_AXIS = 0            
 
 
 def patient_id(path):
-    """patient ID from a filename"""
+    """Parse the patient ID from a filename"""
     match = re.search(PATIENT_REGEX, os.path.basename(path))
     if match is None:
         raise ValueError(f"Could not parse patient ID from {path}")
     return match.group(1)
 
 
-PAIR_REGEX = r"^(B\d+_Week\d+)" 
+PAIR_REGEX = r"^([A-Z]\d+_Week\d+)" 
 
 
 def pair_key(path):
-    """Key identifying scan"""
+    """Key identifying one scan"""
     match = re.search(PAIR_REGEX, os.path.basename(path))
     if match is None:
         raise ValueError(f"Could not parse patient/week key from {path}")
@@ -50,6 +51,9 @@ def pair_key(path):
 
 
 def find_pairs(data_root=DATA_ROOT):
+    """
+    Return (image_path, label_path) 
+    """
     images = sorted(glob.glob(os.path.join(data_root, IMAGE_DIR, "*.nii*")))
     labels = sorted(glob.glob(os.path.join(data_root, LABEL_DIR, "*.nii*")))
     if not images or not labels:
@@ -68,6 +72,10 @@ def find_pairs(data_root=DATA_ROOT):
 
 
 def get_splits(data_root=DATA_ROOT, seed=0, fractions=(0.7, 0.15, 0.15)):
+    """
+    patient-level train/val/test split.
+    Returns "train","val","test".
+    """
     by_patient = defaultdict(list)
     for pair in find_pairs(data_root):
         by_patient[patient_id(pair[0])].append(pair)
@@ -104,8 +112,11 @@ def save_splits(splits, path):
 
 
 def load_volume(path, is_label, target_shape=TARGET_SHAPE):
+    """
+    Load a NIfTI volume, downsample to target_shape.
+    """
     data = nib.load(path).get_fdata(caching="unchanged")
-    if data.ndim == 4:                     
+    if data.ndim == 4:                       # occasional extra dimension in HipMRI
         data = data[..., 0]
     tensor = torch.from_numpy(np.asarray(data, dtype=np.float32))[None, None]
 
@@ -118,7 +129,7 @@ def load_volume(path, is_label, target_shape=TARGET_SHAPE):
     return (resized - resized.mean()) / (resized.std() + 1e-8)
 
 
-def augment_pair(image, mask, flip_axes=(1,), noise_std=0.05):
+def augment_pair(image, mask, flip_axes=(LEFT_RIGHT_AXIS,), noise_std=0.05):
     for axis in flip_axes:
         if torch.rand(1).item() < 0.5:
             image = image.flip(axis + 1)     # +1 skips the channel dimension
@@ -131,12 +142,11 @@ def augment_pair(image, mask, flip_axes=(1,), noise_std=0.05):
 
 class HipMRIVolumes(Dataset):
     """
-      returns (image (1,H,W,D)
-    `images`, `labels` and `names` for evaluation.
+    Whole downsampled volumes.
     """
 
     def __init__(self, pairs, target_shape=TARGET_SHAPE, augment=False,
-                 flip_axes=(1,), max_volumes=None):
+                 flip_axes=(LEFT_RIGHT_AXIS,), max_volumes=None):
         if max_volumes is not None:
             pairs = pairs[:max_volumes]
         self.augment = augment
@@ -158,12 +168,12 @@ class HipMRIVolumes(Dataset):
 
 class HipMRISlices(Dataset):
     """
-    2D slices cut along the depth axis of a 
-
+    2D slices
     Sharing the volume store with the 3D dataset guarantees the baseline sees
+    exactly the same patients
     """
 
-    def __init__(self, volumes, augment=False, flip_axes=(1,)):
+    def __init__(self, volumes, augment=False, flip_axes=(LEFT_RIGHT_AXIS,)):
         self.volumes = volumes
         self.augment = augment
         self.flip_axes = flip_axes
