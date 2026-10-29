@@ -1,0 +1,58 @@
+{
+  "model": "2d",
+  "best_epoch": 13,
+  "best_val_prostate_dice": 0.754139224367757,
+  "test": {
+    "n_cases": 26,
+    "prostate_dice": 0.8314950718329503,
+    "prostate_iou": 0.716819935120069,
+    "outside_extent": 0.01198738334429722,
+    "leak_bladder": 0.013221276641278553,
+    "leak_rectum": 0.0,
+    "time_s": 0.016574740409851074,
+    "dice_low": 0.8261220298714208,
+    "dice_mid": 0.8905301949104257,
+    "dice_high": 0.7500703000868005,
+    "dice_per_class": [
+      0.9939863888116983,
+      0.979360587321795,
+      0.8963018701626704,
+      0.9104250004658332,
+      0.845810931462508,
+      0.8314950718329503
+    ],
+    "iou_per_class": [
+      0.9880552887916565,
+      0.9596956784908588,
+      0.8122030198574066,
+      0.8495369318586129,
+      0.735073976791822,
+      0.716819935120069
+    ],
+    "foreground_dice": 0.8926786922491514
+  },
+  "resources": {
+    "trainable_parameters": 482534,
+    "peak_train_vram_gb": 0.406516224,
+    "peak_inference_vram_gb": 0.303481344,
+    "inference_time_per_volume_s": 0.016574740409851074,
+    "total_train_time_s": 1057.102401971817,
+    "seconds_per_epoch": 21.14204803943634
+  },
+  "args": {
+    "model": "2d",
+    "data_root": "/home/groups/comp3710/HipMRI_Study_open",
+    "out_dir": "outputs",
+    "epochs": 50,
+    "batch_size": 16,
+    "lr": 0.001,
+    "weight_decay": 1e-05,
+    "base_channels": 16,
+    "depth": 3,
+    "dropout": 0.0,
+    "amp": false,
+    "num_workers": 2,
+    "seed": 0,
+    "max_volumes": null
+  }
+}
